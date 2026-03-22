@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MindDuel - 5秒限时版</title>
+    <title>MindDuel - 5秒限时决斗版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/socket.io/socket.io.js"></script>
     <style>
@@ -14,22 +14,25 @@
         .skill-card { position: relative; border-radius: 8px; transition: all 0.1s; overflow: hidden; border: 2px solid rgba(139, 92, 246, 0.3); background-size: cover; background-position: center; }
         .skill-card:active { transform: scale(0.95); filter: brightness(1.2); }
         .skill-card.disabled { filter: grayscale(1) opacity(0.3); pointer-events: none; }
-        .battle-card { width: 120px; height: 168px; border-radius: 12px; background-size: cover; background-position: center; border: 3px solid; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; opacity: 0; }
+        .battle-card { width: 110px; height: 154px; border-radius: 12px; background-size: cover; background-position: center; border: 3px solid; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; opacity: 0; }
         .slam-in { animation: slam 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
         @keyframes slam { 0% { transform: scale(1.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         .card-hidden { background-image: linear-gradient(135deg, #0f172a, #1e2937) !important; border-color: #3b82f6 !important; }
-        #focus-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); z-index: 150; display: none; align-items: center; justify-content: center; }
+        #focus-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 150; display: none; align-items: center; justify-content: center; }
         .focus-card-anim { width: 180px; height: 252px; border-radius: 16px; background-size: cover; background-position: center; border: 4px solid; animation: focusCast 0.9s forwards; }
         @keyframes focusCast { 0% { transform: scale(0.2) translateY(200px); opacity: 0; } 20% { transform: scale(1.1) translateY(0); opacity: 1; } 80% { transform: scale(1) translateY(0); opacity: 1; } 100% { transform: scale(0.5) translateY(300px); opacity: 0; } }
-        /* 倒计时条动画 */
-        #timer-bar { transition: width 1s linear; }
+        
+        /* 倒计时条优化：增加过渡平滑感 */
+        #timer-bar { transition: width 1s linear, background-color 0.3s; }
+        .timer-danger { animation: shake 0.2s infinite; }
+        @keyframes shake { 0% { transform: translateX(-1px); } 50% { transform: translateX(1px); } 100% { transform: translateX(0); } }
     </style>
 </head>
 <body class="h-screen flex flex-col">
 
     <div id="lobby" class="absolute inset-0 z-[100] bg-slate-950/90 backdrop-blur-xl flex flex-col items-center justify-center p-6 text-center">
         <h1 class="text-5xl font-black italic text-blue-500 mb-8 tracking-tighter">MIND DUEL</h1>
-        <button id="match-btn" onclick="startMatchmaking()" class="w-64 bg-blue-600 py-4 rounded-xl font-bold text-xl shadow-lg shadow-blue-900/50">寻找对手</button>
+        <button id="match-btn" onclick="startMatchmaking()" class="w-64 bg-blue-600 py-4 rounded-xl font-bold text-xl shadow-lg shadow-blue-900/50 active:scale-95 transition-transform">寻找对手</button>
         <p id="conn-status" class="text-yellow-500 text-sm mt-4 h-4"></p>
     </div>
 
@@ -41,9 +44,10 @@
             <div id="opp-orbs" class="mt-2 flex"></div>
         </div>
 
-        <div id="timer-ui" class="absolute top-[20vh] left-1/2 -translate-x-1/2 z-10 w-32 text-center opacity-0 transition-opacity">
-            <div id="timer-text" class="text-3xl font-black italic text-yellow-400 drop-shadow-lg">5</div>
-            <div class="w-full h-1.5 bg-gray-800 rounded-full mt-1 overflow-hidden">
+        <div id="timer-ui" class="absolute top-[20vh] left-1/2 -translate-x-1/2 z-10 w-40 text-center opacity-0 transition-opacity duration-300">
+            <div class="text-[10px] text-white/50 uppercase tracking-widest mb-1">Decide Now</div>
+            <div id="timer-text" class="text-4xl font-black italic text-yellow-400 drop-shadow-[0_0_10px_rgba(234,179,8,0.5)]">5</div>
+            <div class="w-full h-1.5 bg-gray-800/80 rounded-full mt-1 overflow-hidden backdrop-blur-sm">
                 <div id="timer-bar" class="h-full bg-yellow-500 w-full"></div>
             </div>
         </div>
@@ -52,13 +56,13 @@
             <div id="opp-played-card" class="battle-card"></div>
             <div id="my-played-card" class="battle-card"></div>
             
-            <div id="game-over-panel" class="absolute inset-0 bg-black/90 hidden flex-col items-center justify-center z-30">
-                <h2 id="result-title" class="text-6xl font-black mb-8"></h2>
-                <button onclick="requestRestart()" class="px-12 py-4 bg-white text-black font-bold rounded-full text-xl">重塑精神</button>
+            <div id="game-over-panel" class="absolute inset-0 bg-black/95 hidden flex-col items-center justify-center z-30 backdrop-blur-md">
+                <h2 id="result-title" class="text-7xl font-black mb-8 italic italic tracking-tighter"></h2>
+                <button onclick="location.reload()" class="px-12 py-4 bg-blue-600 text-white font-bold rounded-full text-xl shadow-xl">再来一局</button>
             </div>
         </div>
 
-        <div class="bg-slate-900/90 border-t-2 border-indigo-500/30 rounded-t-3xl p-4">
+        <div class="bg-slate-900/95 border-t-2 border-indigo-500/30 rounded-t-3xl p-4 pb-8 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
             <div class="flex justify-between items-center mb-4 px-2">
                 <div id="my-orbs" class="flex"></div>
                 <div id="my-avatar" class="w-10 h-10 bg-slate-800 rounded-full border-2 border-blue-500" style="background-image: url('图片/zheng1.jpg'); background-size: cover;"></div>
@@ -74,9 +78,9 @@
                 <button id="btn-d2" onclick="commitAction('DEFENSE', 2)" class="skill-card h-14"><span class="absolute top-0 right-0 bg-emerald-600 px-2 text-[10px] rounded-bl-lg">LV2</span><span class="font-bold">坚壁</span></button>
                 <button id="btn-a4" onclick="commitAction('ATTACK', 4)" class="skill-card h-14"><span class="absolute top-0 right-0 bg-red-800 px-2 text-[10px] rounded-bl-lg">MAX</span><span class="font-bold">毁灭</span></button>
                 <button id="btn-d3" onclick="commitAction('DEFENSE', 3)" class="skill-card h-14"><span class="absolute top-0 right-0 bg-emerald-600 px-2 text-[10px] rounded-bl-lg">LV3</span><span class="font-bold">领域</span></button>
-                <button id="btn-d4" onclick="commitAction('DEFENSE', 4)" class="skill-card col-span-2 h-14"><span class="absolute top-0 right-0 bg-yellow-600 px-2 text-[10px] rounded-bl-lg text-black">ULTRA</span><span class="font-bold text-yellow-400">绝对镜像</span></button>
+                <button id="btn-d4" onclick="skill_d4()" class="skill-card col-span-2 h-14"><span class="absolute top-0 right-0 bg-yellow-600 px-2 text-[10px] rounded-bl-lg text-black">ULTRA</span><span class="font-bold text-yellow-400">绝对镜像</span></button>
             </div>
-            <div id="wait-mask" class="absolute inset-0 z-20 hidden bg-black/20 rounded-t-3xl"></div>
+            <div id="wait-mask" class="absolute inset-0 z-20 hidden bg-black/40 rounded-t-3xl flex items-center justify-center"><span class="text-white/50 italic animate-pulse">Waiting for opponent...</span></div>
         </div>
     </div>
 
@@ -100,15 +104,16 @@
 
         let me = { nianli: 0, alive: true, action: null };
         let opp = { nianli: 0, alive: true, action: null };
-        let gameOver = false;
-        let isCasting = false;
-        let turnTimer = null;
-        let timeLeft = 5;
+        let gameOver = false, isCasting = false;
+        let turnTimer = null, timeLeft = 5;
 
         const socket = io();
 
         function initBgs() {
-            const set = (id, url) => document.getElementById(id).style.backgroundImage = `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.7)), url('${url}')`;
+            const set = (id, url) => {
+                const el = document.getElementById(id);
+                if(el) el.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.7)), url('${url}')`;
+            };
             set('btn-charge', CARDS_DICT.CHARGE.bg);
             for(let i=1; i<=4; i++) set('btn-a'+i, CARDS_DICT.ATTACK[i].bg);
             for(let i=0; i<=4; i++) set('btn-d'+i, CARDS_DICT.DEFENSE[i].bg);
@@ -116,8 +121,8 @@
         initBgs();
 
         function startMatchmaking() {
-            const btn = document.getElementById('match-btn');
-            btn.disabled = true; btn.innerText = '正在搜寻对手...';
+            document.getElementById('match-btn').disabled = true;
+            document.getElementById('conn-status').innerText = '正在搜寻意志波段...';
             socket.emit('find_match');
         }
 
@@ -125,59 +130,58 @@
             document.getElementById('lobby').style.display = 'none';
             document.getElementById('arena').style.display = 'flex';
             updateUI();
-            startCountdown(); // 匹配成功，开启第一回合倒计时
+            startCountdown(); // 比赛开始，立刻计时
         });
 
-        socket.on('ACTION', (data) => {
-            opp.action = data.action;
-            const card = document.getElementById('opp-played-card');
-            card.className = 'battle-card card-hidden slam-in';
-            card.style.opacity = '1';
-            checkResolution();
-        });
-
-        // 核心倒计时逻辑
+        // 核心倒计时：5秒不选则强制冥想
         function startCountdown() {
             if (gameOver) return;
             clearInterval(turnTimer);
             timeLeft = 5;
             updateTimerUI();
-            document.getElementById('timer-ui').style.opacity = '1';
+            const ui = document.getElementById('timer-ui');
+            ui.style.opacity = '1';
+            ui.classList.remove('timer-danger');
 
             turnTimer = setInterval(() => {
                 timeLeft--;
                 updateTimerUI();
+                
+                if(timeLeft <= 2) ui.classList.add('timer-danger'); // 最后2秒震动提醒
+
                 if (timeLeft <= 0) {
                     clearInterval(turnTimer);
-                    if (!me.action) commitAction('CHARGE', 0); // 强制冥想
+                    if (!me.action) commitAction('CHARGE', 0); // 时间到，自动执行冥想术
                 }
             }, 1000);
         }
 
         function updateTimerUI() {
             document.getElementById('timer-text').innerText = timeLeft;
-            document.getElementById('timer-bar').style.width = (timeLeft / 5 * 100) + '%';
-            document.getElementById('timer-bar').style.backgroundColor = timeLeft <= 2 ? '#ef4444' : '#eab308';
+            const bar = document.getElementById('timer-bar');
+            bar.style.width = (timeLeft / 5 * 100) + '%';
+            bar.style.backgroundColor = timeLeft <= 2 ? '#ef4444' : '#eab308';
         }
 
         function commitAction(type, level) {
             if(gameOver || me.action || isCasting) return;
             
-            clearInterval(turnTimer); // 选好牌了，停止倒计时
+            // 选牌后立即停止并隐藏倒计时
+            clearInterval(turnTimer);
             document.getElementById('timer-ui').style.opacity = '0';
 
             me.action = { type, level };
             isCasting = true;
-            document.getElementById('wait-mask').style.display = 'block';
+            document.getElementById('wait-mask').style.display = 'flex';
 
-            // 播放聚焦动画
             const overlay = document.getElementById('focus-overlay');
             const focus = document.getElementById('focus-card');
             overlay.style.display = 'flex';
             const data = type === 'CHARGE' ? CARDS_DICT.CHARGE : CARDS_DICT[type][level];
+            
             focus.className = `focus-card-anim border-4 ${data.color}`;
-            focus.style.backgroundImage = `url('${data.bg}')`;
-            focus.innerHTML = `<div class="mt-auto mb-4 text-center font-bold text-2xl">${data.name}</div>`;
+            focus.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.6)), url('${data.bg}')`;
+            focus.innerHTML = `<div class="mt-auto mb-6 text-center font-black text-3xl italic">${data.name}</div>`;
 
             socket.emit('ACTION', { action: me.action });
 
@@ -189,14 +193,24 @@
             }, 900);
         }
 
+        function skill_d4() { commitAction('DEFENSE', 4); }
+
         function renderCard(id, act) {
             const el = document.getElementById(id);
             const data = act.type === 'CHARGE' ? CARDS_DICT.CHARGE : CARDS_DICT[act.type][act.level];
             el.className = `battle-card slam-in ${data.color}`;
             el.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.8)), url('${data.bg}')`;
             el.style.opacity = '1';
-            el.innerHTML = `<div class="mt-auto mb-2 text-sm font-bold">${data.name}</div>`;
+            el.innerHTML = `<div class="mt-auto mb-3 text-sm font-black italic">${data.name}</div>`;
         }
+
+        socket.on('ACTION', (data) => {
+            opp.action = data.action;
+            const card = document.getElementById('opp-played-card');
+            card.className = 'battle-card card-hidden slam-in';
+            card.style.opacity = '1';
+            checkResolution();
+        });
 
         function checkResolution() {
             if(me.action && opp.action && !isCasting) resolveTurn();
@@ -205,12 +219,11 @@
         async function resolveTurn() {
             await new Promise(r => setTimeout(r, 600));
             renderCard('opp-played-card', opp.action);
-            await new Promise(r => setTimeout(r, 800));
+            await new Promise(r => setTimeout(r, 1000));
 
             let mD = false, oD = false;
             let m=me.action, o=opp.action;
 
-            // 简化版判定逻辑
             if(m.type==='CHARGE' && o.type==='ATTACK') mD=true;
             else if(o.type==='CHARGE' && m.type==='ATTACK') oD=true;
             else if(m.type==='ATTACK' && o.type==='ATTACK'){
@@ -221,19 +234,23 @@
                 if(m.level === 4) oD=true; else if(m.level < o.level-1) mD=true;
             }
 
-            if(mD) { me.alive=false; document.getElementById('my-avatar').style.filter = 'grayscale(1)'; }
-            if(oD) { opp.alive=false; document.getElementById('opp-avatar').style.filter = 'grayscale(1)'; }
+            if(mD) { me.alive=false; document.getElementById('my-avatar').style.filter = 'grayscale(1) contrast(2)'; }
+            if(oD) { opp.alive=false; document.getElementById('opp-avatar').style.filter = 'grayscale(1) contrast(2)'; }
 
             if(!mD) { if(m.type==='CHARGE') me.nianli = Math.min(4, me.nianli+1); else me.nianli -= m.level; }
             if(!oD) { if(o.type==='CHARGE') opp.nianli = Math.min(4, opp.nianli+1); else opp.nianli -= o.level; }
 
             updateUI();
-            await new Promise(r => setTimeout(r, 1000));
+            await new Promise(r => setTimeout(r, 1200));
 
             if(!me.alive || !opp.alive) {
                 gameOver = true;
-                document.getElementById('game-over-panel').style.display = 'flex';
-                document.getElementById('result-title').innerText = me.alive ? '胜利' : '战败';
+                const panel = document.getElementById('game-over-panel');
+                panel.style.display = 'flex';
+                const title = document.getElementById('result-title');
+                if(!me.alive && !opp.alive) { title.innerText = '同归于尽'; title.className = "text-gray-500 text-6xl font-black"; }
+                else if(me.alive) { title.innerText = '胜 利'; title.className = "text-blue-500 text-7xl font-black"; }
+                else { title.innerText = '败 北'; title.className = "text-red-600 text-7xl font-black"; }
             } else {
                 nextRound();
             }
@@ -244,7 +261,7 @@
             document.getElementById('wait-mask').style.display = 'none';
             document.getElementById('my-played-card').style.opacity = '0';
             document.getElementById('opp-played-card').style.opacity = '0';
-            startCountdown(); // 开启下一回合计时
+            startCountdown(); // 结算结束，进入新回合倒计时
         }
 
         function updateUI() {
@@ -255,15 +272,14 @@
             ['a1','a2','a3','a4','d0','d1','d2','d3','d4'].forEach(id => {
                 const btn = document.getElementById('btn-'+id);
                 if(btn) {
-                    if(me.nianli < parseInt(id[1])) btn.classList.add('disabled');
+                    const level = parseInt(id[1]);
+                    if(me.nianli < level) btn.classList.add('disabled');
                     else btn.classList.remove('disabled');
                 }
             });
         }
 
-        function requestRestart() { socket.emit('RESTART'); location.reload(); }
-        socket.on('RESTART', () => location.reload());
-        socket.on('opponent_disconnected', () => { alert('对手逃跑了'); location.reload(); });
+        socket.on('opponent_disconnected', () => { alert('对手精神崩溃，已切断连接'); location.reload(); });
     </script>
 </body>
 </html>
