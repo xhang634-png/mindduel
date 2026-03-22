@@ -3,283 +3,338 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MindDuel - 5秒限时决斗版</title>
+    <title>MindDuel - 随机匹配版</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    
     <script src="/socket.io/socket.io.js"></script>
+    
     <style>
-        body { touch-action: manipulation; overflow: hidden; background-color: #0d0111; background-image: url('图片/beijing1.jpg'); background-size: cover; background-position: center; color: #e5e7eb; font-family: sans-serif; } 
-        .orb { width: 16px; height: 16px; border-radius: 50%; display: inline-block; margin-right: 6px; transition: 0.5s; }
-        .orb-active { background: #60a5fa; box-shadow: 0 0 15px #3b82f6, inset 0 0 5px white; }
+        body { touch-action: manipulation; overflow: hidden; background-color: #0d0111; background-image: url('图片/beijing1.jpg'); background-size: cover; background-position: center; color: #e5e7eb; } 
+        .orb { width: 16px; height: 16px; border-radius: 50%; display: inline-block; margin-right: 6px; transition: 0.5s; position: relative; }
+        .orb-active { background: #60a5fa; box-shadow: 0 0 15px #3b82f6, inset 0 0 5px white; animation: pulse 2s infinite; }
         .orb-empty { border: 2px solid #334155; }
         .skill-card { position: relative; border-radius: 8px; transition: all 0.1s; overflow: hidden; border: 2px solid rgba(139, 92, 246, 0.3); background-size: cover; background-position: center; }
         .skill-card:active { transform: scale(0.95); filter: brightness(1.2); }
         .skill-card.disabled { filter: grayscale(1) opacity(0.3); pointer-events: none; }
-        .battle-card { width: 110px; height: 154px; border-radius: 12px; background-size: cover; background-position: center; border: 3px solid; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; opacity: 0; }
+        .battle-card { width: 120px; height: 168px; border-radius: 12px; background-size: cover; background-position: center; border: 3px solid; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 15px 30px rgba(0,0,0,0.8); position: relative; overflow: hidden; opacity: 0; }
         .slam-in { animation: slam 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
         @keyframes slam { 0% { transform: scale(1.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         .card-hidden { background-image: linear-gradient(135deg, #0f172a, #1e2937) !important; border-color: #3b82f6 !important; }
-        #focus-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 150; display: none; align-items: center; justify-content: center; }
-        .focus-card-anim { width: 180px; height: 252px; border-radius: 16px; background-size: cover; background-position: center; border: 4px solid; animation: focusCast 0.9s forwards; }
-        @keyframes focusCast { 0% { transform: scale(0.2) translateY(200px); opacity: 0; } 20% { transform: scale(1.1) translateY(0); opacity: 1; } 80% { transform: scale(1) translateY(0); opacity: 1; } 100% { transform: scale(0.5) translateY(300px); opacity: 0; } }
-        
-        /* 倒计时条优化：增加过渡平滑感 */
-        #timer-bar { transition: width 1s linear, background-color 0.3s; }
-        .timer-danger { animation: shake 0.2s infinite; }
-        @keyframes shake { 0% { transform: translateX(-1px); } 50% { transform: translateX(1px); } 100% { transform: translateX(0); } }
+        .card-header { position: absolute; top: 0; left: 0; right: 0; padding: 4px; background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent); text-align: left; }
+        .card-title { font-weight: bold; font-size: 16px; text-shadow: 1px 1px 2px black; text-align: center; width: 100%; margin-top: 20px;}
+        .card-level { position: absolute; top: 0; right: 0; padding: 2px 6px; font-size: 12px; border-bottom-left-radius: 8px; font-weight: bold;}
+        #focus-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); z-index: 150; display: none; flex-direction: column; align-items: center; justify-content: center; }
+        .focus-card-anim { width: 180px; height: 252px; border-radius: 16px; background-size: cover; background-position: center; border: 4px solid; box-shadow: 0 20px 60px rgba(0,0,0,0.9), 0 0 30px rgba(139, 92, 246, 0.5); display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; animation: focusCast 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+        @keyframes focusCast { 0% { transform: scale(0.2) translateY(200px); opacity: 0; } 20% { transform: scale(1.1) translateY(0); opacity: 1; } 30% { transform: scale(1) translateY(0); opacity: 1; } 70% { transform: scale(1) translateY(0); opacity: 1; } 100% { transform: scale(0.5) translateY(300px); opacity: 0; } }
+        .clash-me { animation: clashMe 0.4s ease-in-out; }
+        @keyframes clashMe { 0% { transform: translateY(0); } 30% { transform: translateY(20px); } 50% { transform: translateY(-80px) scale(1.1); z-index: 10; } 100% { transform: translateY(0) scale(1); } }
+        .clash-opp { animation: clashOpp 0.4s ease-in-out; }
+        @keyframes clashOpp { 0% { transform: translateY(0); } 30% { transform: translateY(-20px); } 50% { transform: translateY(80px) scale(1.1); z-index: 10; } 100% { transform: translateY(0) scale(1); } }
+        .impact-flash { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 200px; height: 200px; background: radial-gradient(circle, #fff 0%, transparent 60%); mix-blend-mode: overlay; opacity: 0; z-index: 40; pointer-events: none; }
+        .flash-anim { animation: flashImpact 0.3s ease-out; }
+        @keyframes flashImpact { 0% { opacity: 1; transform: translate(-50%, -50%) scale(0.2); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(2); } }
+        .shake-light { animation: shake 0.3s both; }
+        .shake-heavy { animation: shakeHeavy 0.4s both; }
+        @keyframes shake { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(-4px, 4px); } 75% { transform: translate(4px, -4px); } }
+        @keyframes shakeHeavy { 0%, 100% { transform: translate(0, 0); } 20% { transform: translate(-8px, 8px); } 40% { transform: translate(8px, -8px); } 60% { transform: translate(-8px, -8px); } 80% { transform: translate(8px, 8px); } }
+        .hero-dead { filter: grayscale(100%) brightness(0.3) contrast(1.5); transform: scale(0.9) rotate(5deg); transition: all 0.3s;}
     </style>
 </head>
 <body class="h-screen flex flex-col">
 
     <div id="lobby" class="absolute inset-0 z-[100] bg-slate-950/90 backdrop-blur-xl flex flex-col items-center justify-center p-6 text-center">
-        <h1 class="text-5xl font-black italic text-blue-500 mb-8 tracking-tighter">MIND DUEL</h1>
-        <button id="match-btn" onclick="startMatchmaking()" class="w-64 bg-blue-600 py-4 rounded-xl font-bold text-xl shadow-lg shadow-blue-900/50 active:scale-95 transition-transform">寻找对手</button>
-        <p id="conn-status" class="text-yellow-500 text-sm mt-4 h-4"></p>
+        <h1 class="text-5xl font-black italic text-blue-500 mb-8">MIND DUEL</h1>
+        <div class="w-full max-w-sm bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl">
+            <p class="text-gray-400 mb-6 text-sm">连接至中央精神网络...</p>
+            <button id="match-btn" onclick="startMatchmaking()" class="w-full bg-blue-600 py-4 rounded-xl font-bold active:scale-95 transition-all">寻找对手匹配</button>
+            <p id="conn-status" class="text-yellow-500 text-xs mt-4 h-4"></p>
+        </div>
     </div>
 
     <div id="focus-overlay"><div id="focus-card"></div></div>
 
     <div id="arena" class="hidden flex-col h-full max-w-lg mx-auto w-full relative">
-        <div class="h-[18vh] flex flex-col items-center justify-center border-b border-white/10 bg-black/40">
-            <div id="opp-avatar" class="w-14 h-14 bg-slate-800 rounded-full border-2 border-red-500" style="background-image: url('图片/zheng2.jpg'); background-size: cover;"></div>
-            <div id="opp-orbs" class="mt-2 flex"></div>
+        <div class="h-[15vh] flex flex-col items-center justify-center border-b border-gray-800 bg-black/50">
+            <div id="opp-avatar" class="w-12 h-12 bg-red-900 rounded-xl border-2 border-red-500 flex items-center justify-center" style="background-image: url('图片/zheng2.jpg'); background-size: cover; background-position: center;"></div>
+            <div class="mt-2 text-red-400 font-bold text-xs uppercase">对手</div>
+            <div id="opp-orbs" class="mt-1 flex"></div>
         </div>
 
-        <div id="timer-ui" class="absolute top-[20vh] left-1/2 -translate-x-1/2 z-10 w-40 text-center opacity-0 transition-opacity duration-300">
-            <div class="text-[10px] text-white/50 uppercase tracking-widest mb-1">Decide Now</div>
-            <div id="timer-text" class="text-4xl font-black italic text-yellow-400 drop-shadow-[0_0_10px_rgba(234,179,8,0.5)]">5</div>
-            <div class="w-full h-1.5 bg-gray-800/80 rounded-full mt-1 overflow-hidden backdrop-blur-sm">
-                <div id="timer-bar" class="h-full bg-yellow-500 w-full"></div>
-            </div>
-        </div>
-
-        <div class="flex-grow flex items-center justify-center gap-4 relative">
+        <div class="flex-grow flex items-center justify-center gap-6 relative overflow-hidden bg-black/40">
+            <div id="impact-flash" class="impact-flash"></div>
             <div id="opp-played-card" class="battle-card"></div>
+            <div class="text-slate-600 font-black italic text-2xl z-0">VS</div>
             <div id="my-played-card" class="battle-card"></div>
-            
-            <div id="game-over-panel" class="absolute inset-0 bg-black/95 hidden flex-col items-center justify-center z-30 backdrop-blur-md">
-                <h2 id="result-title" class="text-7xl font-black mb-8 italic italic tracking-tighter"></h2>
-                <button onclick="location.reload()" class="px-12 py-4 bg-blue-600 text-white font-bold rounded-full text-xl shadow-xl">再来一局</button>
+            <div id="game-over-panel" class="absolute inset-0 bg-black/90 hidden flex-col items-center justify-center z-30">
+                <h2 id="result-title" class="text-5xl font-black mb-6"></h2>
+                <button onclick="requestRestart()" class="px-10 py-3 bg-white text-black font-bold rounded-full">再来一局</button>
             </div>
         </div>
 
-        <div class="bg-slate-900/95 border-t-2 border-indigo-500/30 rounded-t-3xl p-4 pb-8 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
-            <div class="flex justify-between items-center mb-4 px-2">
-                <div id="my-orbs" class="flex"></div>
-                <div id="my-avatar" class="w-10 h-10 bg-slate-800 rounded-full border-2 border-blue-500" style="background-image: url('图片/zheng1.jpg'); background-size: cover;"></div>
+        <div class="bg-violet-950/90 border-t-2 border-violet-800 rounded-t-3xl pb-safe relative">
+            <div class="flex justify-between items-center px-6 py-3 border-b border-violet-800">
+                <div id="my-orbs" class="flex h-4"></div>
+                <div id="my-avatar" class="w-10 h-10 bg-blue-900 rounded-xl border-2 border-blue-500 flex items-center justify-center" style="background-image: url('图片/zheng1.jpg'); background-size: cover; background-position: center;"></div>
             </div>
 
-            <div class="grid grid-cols-2 gap-2" id="hand-container">
-                <button id="btn-charge" onclick="commitAction('CHARGE', 0)" class="skill-card col-span-2 py-4"><div class="font-bold text-indigo-100">冥想术 (+1念力)</div></button>
-                <button id="btn-a1" onclick="commitAction('ATTACK', 1)" class="skill-card h-14"><span class="absolute top-0 right-0 bg-red-600 px-2 text-[10px] rounded-bl-lg">LV1</span><span class="font-bold">突刺</span></button>
-                <button id="btn-d0" onclick="commitAction('DEFENSE', 0)" class="skill-card h-14"><span class="absolute top-0 right-0 bg-emerald-600 px-2 text-[10px] rounded-bl-lg">LV0</span><span class="font-bold">格挡</span></button>
-                <button id="btn-a2" onclick="commitAction('ATTACK', 2)" class="skill-card h-14"><span class="absolute top-0 right-0 bg-red-600 px-2 text-[10px] rounded-bl-lg">LV2</span><span class="font-bold">压制</span></button>
-                <button id="btn-d1" onclick="commitAction('DEFENSE', 1)" class="skill-card h-14"><span class="absolute top-0 right-0 bg-emerald-600 px-2 text-[10px] rounded-bl-lg">LV1</span><span class="font-bold">灵盾</span></button>
-                <button id="btn-a3" onclick="commitAction('ATTACK', 3)" class="skill-card h-14"><span class="absolute top-0 right-0 bg-red-600 px-2 text-[10px] rounded-bl-lg">LV3</span><span class="font-bold">贯穿</span></button>
-                <button id="btn-d2" onclick="commitAction('DEFENSE', 2)" class="skill-card h-14"><span class="absolute top-0 right-0 bg-emerald-600 px-2 text-[10px] rounded-bl-lg">LV2</span><span class="font-bold">坚壁</span></button>
-                <button id="btn-a4" onclick="commitAction('ATTACK', 4)" class="skill-card h-14"><span class="absolute top-0 right-0 bg-red-800 px-2 text-[10px] rounded-bl-lg">MAX</span><span class="font-bold">毁灭</span></button>
-                <button id="btn-d3" onclick="commitAction('DEFENSE', 3)" class="skill-card h-14"><span class="absolute top-0 right-0 bg-emerald-600 px-2 text-[10px] rounded-bl-lg">LV3</span><span class="font-bold">领域</span></button>
-                <button id="btn-d4" onclick="skill_d4()" class="skill-card col-span-2 h-14"><span class="absolute top-0 right-0 bg-yellow-600 px-2 text-[10px] rounded-bl-lg text-black">ULTRA</span><span class="font-bold text-yellow-400">绝对镜像</span></button>
+            <div class="p-3 grid grid-cols-2 gap-2" id="hand-container">
+                <button id="btn-charge" onclick="commitAction('CHARGE', 0)" class="skill-card col-span-2 py-4 bg-slate-800"><div class="text-indigo-200 font-bold">冥想术 (+1 念力)</div></button>
+                <button id="btn-a1" onclick="commitAction('ATTACK', 1)" class="skill-card h-14 bg-red-950"><span class="card-level bg-red-800 text-white">LV1</span><span class="text-rose-200 font-bold">突刺</span></button>
+                <button id="btn-d0" onclick="commitAction('DEFENSE', 0)" class="skill-card h-14 bg-emerald-950"><span class="card-level bg-emerald-800 text-white">LV0</span><span class="text-emerald-200 font-bold">空手入白刃</span></button>
+                <button id="btn-a2" onclick="commitAction('ATTACK', 2)" class="skill-card h-14 bg-red-950"><span class="card-level bg-red-800 text-white">LV2</span><span class="text-rose-200 font-bold">精神重压</span></button>
+                <button id="btn-d1" onclick="commitAction('DEFENSE', 1)" class="skill-card h-14 bg-emerald-950"><span class="card-level bg-emerald-800 text-white">LV1</span><span class="text-emerald-200 font-bold">灵觉守</span></button>
+                <button id="btn-a3" onclick="commitAction('ATTACK', 3)" class="skill-card h-14 bg-red-950"><span class="card-level bg-red-800 text-white">LV3</span><span class="text-rose-200 font-bold">念力贯穿</span></button>
+                <button id="btn-d2" onclick="commitAction('DEFENSE', 2)" class="skill-card h-14 bg-emerald-950"><span class="card-level bg-emerald-800 text-white">LV2</span><span class="text-emerald-200 font-bold">意志坚壁</span></button>
+                <button id="btn-a4" onclick="commitAction('ATTACK', 4)" class="skill-card h-14 bg-red-900"><span class="card-level bg-red-600 text-white">MAX</span><span class="text-white font-black">终极毁灭</span></button>
+                <button id="btn-d3" onclick="commitAction('DEFENSE', 3)" class="skill-card h-14 bg-emerald-950"><span class="card-level bg-emerald-800 text-white">LV3</span><span class="text-emerald-200 font-bold">念力场</span></button>
+                <button id="btn-d4" onclick="commitAction('DEFENSE', 4)" class="skill-card col-span-2 h-14 bg-yellow-900/50"><span class="card-level bg-yellow-600 text-black">ULTRA</span><span class="text-yellow-400 font-bold">绝对镜像</span></button>
             </div>
-            <div id="wait-mask" class="absolute inset-0 z-20 hidden bg-black/40 rounded-t-3xl flex items-center justify-center"><span class="text-white/50 italic animate-pulse">Waiting for opponent...</span></div>
+            
+            <div id="wait-mask" class="absolute inset-0 z-20 hidden rounded-t-3xl bg-transparent"></div>
         </div>
     </div>
 
     <script>
         const CARDS_DICT = {
-            'CHARGE': { name: '冥想术', color: 'border-blue-400', bg: '图片/m1.jpg' },
+            'CHARGE': { name: '冥想术', color: 'border-indigo-500', bg: '图片/m1.jpg' },
             'ATTACK': { 
                 1: {name:'突刺', color:'border-red-500', bg: '图片/g1.jpg'}, 
                 2: {name:'精神重压', color:'border-red-500', bg: '图片/g2.jpg'}, 
                 3: {name:'念力贯穿', color:'border-red-500', bg: '图片/g3.jpg'}, 
-                4: {name:'终极毁灭', color:'border-red-600', bg: '图片/g4.jpg'} 
+                4: {name:'终极毁灭', color:'border-red-500', bg: '图片/g4.jpg'} 
             },
             'DEFENSE': { 
-                0: {name:'空手入白刃', color:'border-emerald-400', bg: '图片/f0.jpg'}, 
-                1: {name:'灵觉守', color:'border-emerald-400', bg: '图片/f1.jpg'}, 
-                2: {name:'意志坚壁', color:'border-emerald-400', bg: '图片/f2.jpg'}, 
-                3: {name:'念力场', color:'border-emerald-400', bg: '图片/f3.jpg'}, 
+                0: {name:'空手入白刃', color:'border-emerald-500', bg: '图片/f0.jpg'}, 
+                1: {name:'灵觉守', color:'border-emerald-500', bg: '图片/f1.jpg'}, 
+                2: {name:'意志坚壁', color:'border-emerald-500', bg: '图片/f2.jpg'}, 
+                3: {name:'念力场', color:'border-emerald-500', bg: '图片/f3.jpg'}, 
                 4: {name:'绝对镜像', color:'border-yellow-500', bg: '图片/f4.jpg'} 
             }
         };
 
+        function initSkillBackgrounds() {
+            const applyBg = (id, imgUrl) => {
+                const el = document.getElementById(id);
+                if(el && imgUrl) {
+                    el.style.backgroundImage = `linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.8)), url('${imgUrl}')`;
+                }
+            };
+            applyBg('btn-charge', CARDS_DICT.CHARGE.bg);
+            for(let i=1; i<=4; i++) applyBg('btn-a'+i, CARDS_DICT.ATTACK[i].bg);
+            for(let i=0; i<=4; i++) applyBg('btn-d'+i, CARDS_DICT.DEFENSE[i].bg);
+        }
+
+        // ==========================================
+        // ⚙️ 新的 Socket.io 联机逻辑
+        // ==========================================
         let me = { nianli: 0, alive: true, action: null };
         let opp = { nianli: 0, alive: true, action: null };
-        let gameOver = false, isCasting = false;
-        let turnTimer = null, timeLeft = 5;
+        let gameOver = false;
+        let isCastingAnim = false; 
 
+        // 初始化连接
         const socket = io();
 
-        function initBgs() {
-            const set = (id, url) => {
-                const el = document.getElementById(id);
-                if(el) el.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.7)), url('${url}')`;
-            };
-            set('btn-charge', CARDS_DICT.CHARGE.bg);
-            for(let i=1; i<=4; i++) set('btn-a'+i, CARDS_DICT.ATTACK[i].bg);
-            for(let i=0; i<=4; i++) set('btn-d'+i, CARDS_DICT.DEFENSE[i].bg);
-        }
-        initBgs();
+        window.onload = () => { initSkillBackgrounds(); };
 
+        // 点击匹配按钮
         function startMatchmaking() {
-            document.getElementById('match-btn').disabled = true;
-            document.getElementById('conn-status').innerText = '正在搜寻意志波段...';
+            const btn = document.getElementById('match-btn');
+            btn.disabled = true;
+            btn.innerText = '匹配中...';
+            btn.classList.add('opacity-50');
             socket.emit('find_match');
         }
+
+        socket.on('waiting', (msg) => { document.getElementById('conn-status').innerText = msg; });
 
         socket.on('match_found', () => {
             document.getElementById('lobby').style.display = 'none';
             document.getElementById('arena').style.display = 'flex';
             updateUI();
-            startCountdown(); // 比赛开始，立刻计时
         });
 
-        // 核心倒计时：5秒不选则强制冥想
-        function startCountdown() {
-            if (gameOver) return;
-            clearInterval(turnTimer);
-            timeLeft = 5;
-            updateTimerUI();
-            const ui = document.getElementById('timer-ui');
-            ui.style.opacity = '1';
-            ui.classList.remove('timer-danger');
-
-            turnTimer = setInterval(() => {
-                timeLeft--;
-                updateTimerUI();
-                
-                if(timeLeft <= 2) ui.classList.add('timer-danger'); // 最后2秒震动提醒
-
-                if (timeLeft <= 0) {
-                    clearInterval(turnTimer);
-                    if (!me.action) commitAction('CHARGE', 0); // 时间到，自动执行冥想术
-                }
-            }, 1000);
-        }
-
-        function updateTimerUI() {
-            document.getElementById('timer-text').innerText = timeLeft;
-            const bar = document.getElementById('timer-bar');
-            bar.style.width = (timeLeft / 5 * 100) + '%';
-            bar.style.backgroundColor = timeLeft <= 2 ? '#ef4444' : '#eab308';
-        }
-
-        function commitAction(type, level) {
-            if(gameOver || me.action || isCasting) return;
-            
-            // 选牌后立即停止并隐藏倒计时
-            clearInterval(turnTimer);
-            document.getElementById('timer-ui').style.opacity = '0';
-
-            me.action = { type, level };
-            isCasting = true;
-            document.getElementById('wait-mask').style.display = 'flex';
-
-            const overlay = document.getElementById('focus-overlay');
-            const focus = document.getElementById('focus-card');
-            overlay.style.display = 'flex';
-            const data = type === 'CHARGE' ? CARDS_DICT.CHARGE : CARDS_DICT[type][level];
-            
-            focus.className = `focus-card-anim border-4 ${data.color}`;
-            focus.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.6)), url('${data.bg}')`;
-            focus.innerHTML = `<div class="mt-auto mb-6 text-center font-black text-3xl italic">${data.name}</div>`;
-
-            socket.emit('ACTION', { action: me.action });
-
-            setTimeout(() => {
-                overlay.style.display = 'none';
-                renderCard('my-played-card', me.action);
-                isCasting = false;
-                checkResolution();
-            }, 900);
-        }
-
-        function skill_d4() { commitAction('DEFENSE', 4); }
-
-        function renderCard(id, act) {
-            const el = document.getElementById(id);
-            const data = act.type === 'CHARGE' ? CARDS_DICT.CHARGE : CARDS_DICT[act.type][act.level];
-            el.className = `battle-card slam-in ${data.color}`;
-            el.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.8)), url('${data.bg}')`;
-            el.style.opacity = '1';
-            el.innerHTML = `<div class="mt-auto mb-3 text-sm font-black italic">${data.name}</div>`;
-        }
+        socket.on('opponent_disconnected', () => {
+            alert('对手精神崩溃已逃跑，对局结束！');
+            location.reload(); 
+        });
 
         socket.on('ACTION', (data) => {
             opp.action = data.action;
-            const card = document.getElementById('opp-played-card');
-            card.className = 'battle-card card-hidden slam-in';
-            card.style.opacity = '1';
+            const oppCard = document.getElementById('opp-played-card');
+            oppCard.className = 'battle-card card-hidden slam-in';
+            oppCard.innerHTML = '';
             checkResolution();
         });
 
+        socket.on('RESTART', () => { resetGameState(); });
+
+        function commitAction(type, level) {
+            if(gameOver || me.action || isCastingAnim) return;
+            me.action = { type, level };
+            isCastingAnim = true; 
+            document.getElementById('wait-mask').style.display = 'block'; 
+            
+            const focusOverlay = document.getElementById('focus-overlay');
+            const focusCard = document.getElementById('focus-card');
+            focusOverlay.style.display = 'flex';
+            
+            const data = type === 'CHARGE' ? CARDS_DICT['CHARGE'] : CARDS_DICT[type][level];
+            focusCard.className = `focus-card-anim ${data.color}`;
+            focusCard.style.backgroundImage = `linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.8)), url('${data.bg}')`;
+            
+            const typeStr = type === 'CHARGE' ? '积攒' : (type === 'ATTACK' ? '攻击' : '防御');
+            const levelStr = type === 'CHARGE' ? '+1' : `LV${level}`;
+            const levelBg = type === 'ATTACK' ? 'bg-red-800' : (type === 'CHARGE' ? 'bg-blue-800' : 'bg-emerald-800');
+
+            focusCard.innerHTML = `
+                <div class="card-header"><span class="card-level ${levelBg} text-white">${levelStr}</span></div>
+                <div class="text-sm text-gray-300 uppercase mt-auto">${typeStr}</div>
+                <div class="card-title text-white mb-4 text-xl">${data.name}</div>
+            `;
+
+            // 【核心修改】通过 socket 发送
+            socket.emit('ACTION', { action: me.action });
+
+            setTimeout(() => {
+                focusOverlay.style.display = 'none';
+                renderBattleCard('my-played-card', me.action); 
+                isCastingAnim = false;
+                checkResolution(); 
+            }, 900);
+        }
+
+        function renderBattleCard(elId, act) {
+            const el = document.getElementById(elId);
+            const data = act.type === 'CHARGE' ? CARDS_DICT['CHARGE'] : CARDS_DICT[act.type][act.level];
+            
+            el.className = `battle-card slam-in ${data.color}`;
+            el.style.backgroundImage = `linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.9)), url('${data.bg}')`;
+            
+            const typeStr = act.type === 'CHARGE' ? '积攒' : (act.type === 'ATTACK' ? '攻击' : '防御');
+            const levelStr = act.type === 'CHARGE' ? '+1' : `LV${act.level}`;
+            const levelBg = act.type === 'ATTACK' ? 'bg-red-800' : (act.type === 'CHARGE' ? 'bg-blue-800' : 'bg-emerald-800');
+
+            el.innerHTML = `
+                <div class="card-header"><span class="card-level ${levelBg} text-white">${levelStr}</span></div>
+                <div class="text-xs text-gray-300 uppercase mt-auto">${typeStr}</div>
+                <div class="card-title text-white mb-4">${data.name}</div>
+            `;
+        }
+
         function checkResolution() {
-            if(me.action && opp.action && !isCasting) resolveTurn();
+            if(me.action && opp.action && !isCastingAnim) {
+                resolveTurn();
+            }
         }
 
         async function resolveTurn() {
-            await new Promise(r => setTimeout(r, 600));
-            renderCard('opp-played-card', opp.action);
-            await new Promise(r => setTimeout(r, 1000));
+            await sleep(200);
+            renderBattleCard('opp-played-card', opp.action);
+            await sleep(500); 
 
-            let mD = false, oD = false;
+            const myCardEl = document.getElementById('my-played-card');
+            const oppCardEl = document.getElementById('opp-played-card');
+            myCardEl.classList.add('clash-me');
+            oppCardEl.classList.add('clash-opp');
+            await sleep(200); 
+
+            document.getElementById('impact-flash').classList.add('flash-anim');
+            document.getElementById('arena').classList.add('shake-heavy');
+
+            await sleep(200); 
+            myCardEl.classList.remove('clash-me');
+            oppCardEl.classList.remove('clash-opp');
+            document.getElementById('impact-flash').classList.remove('flash-anim');
+
+            let mDies = false, oDies = false;
             let m=me.action, o=opp.action;
 
-            if(m.type==='CHARGE' && o.type==='ATTACK') mD=true;
-            else if(o.type==='CHARGE' && m.type==='ATTACK') oD=true;
-            else if(m.type==='ATTACK' && o.type==='ATTACK'){
-                if(m.level > o.level) oD=true; else if(o.level > m.level) mD=true;
-            } else if(m.type==='ATTACK' && o.type==='DEFENSE'){
-                if(o.level === 4) mD=true; else if(o.level < m.level-1) oD=true;
-            } else if(o.type==='ATTACK' && m.type==='DEFENSE'){
-                if(m.level === 4) oD=true; else if(m.level < o.level-1) mD=true;
+            if(m.type==='CHARGE' && o.type==='ATTACK') mDies=true;
+            if(o.type==='CHARGE' && m.type==='ATTACK') oDies=true;
+            if(!mDies && !oDies) {
+                if(m.type==='ATTACK' && o.type==='ATTACK') {
+                    if(m.level>o.level) oDies=true; else if(o.level>m.level) mDies=true;
+                } else if(m.type==='ATTACK' && o.type==='DEFENSE') {
+                    if(o.level===4) mDies=true; else if(o.level<m.level-1) oDies=true;
+                } else if(o.type==='ATTACK' && m.type==='DEFENSE') {
+                    if(m.level===4) oDies=true; else if(m.level<o.level-1) mDies=true;
+                }
             }
 
-            if(mD) { me.alive=false; document.getElementById('my-avatar').style.filter = 'grayscale(1) contrast(2)'; }
-            if(oD) { opp.alive=false; document.getElementById('opp-avatar').style.filter = 'grayscale(1) contrast(2)'; }
+            if(mDies) { me.alive=false; document.getElementById('my-avatar').classList.add('hero-dead'); }
+            if(oDies) { opp.alive=false; document.getElementById('opp-avatar').classList.add('hero-dead'); }
 
-            if(!mD) { if(m.type==='CHARGE') me.nianli = Math.min(4, me.nianli+1); else me.nianli -= m.level; }
-            if(!oD) { if(o.type==='CHARGE') opp.nianli = Math.min(4, opp.nianli+1); else opp.nianli -= o.level; }
+            if(!mDies) { if(m.type==='CHARGE') me.nianli = Math.min(4, me.nianli+1); else me.nianli -= m.level; }
+            if(!oDies) { if(o.type==='CHARGE') opp.nianli = Math.min(4, opp.nianli+1); else opp.nianli -= o.level; }
 
-            updateUI();
-            await new Promise(r => setTimeout(r, 1200));
+            renderOrbs();
+            
+            await sleep(400);
+            document.getElementById('arena').classList.remove('shake-heavy');
 
             if(!me.alive || !opp.alive) {
-                gameOver = true;
-                const panel = document.getElementById('game-over-panel');
-                panel.style.display = 'flex';
-                const title = document.getElementById('result-title');
-                if(!me.alive && !opp.alive) { title.innerText = '同归于尽'; title.className = "text-gray-500 text-6xl font-black"; }
-                else if(me.alive) { title.innerText = '胜 利'; title.className = "text-blue-500 text-7xl font-black"; }
-                else { title.innerText = '败 北'; title.className = "text-red-600 text-7xl font-black"; }
+                gameOver=true;
+                showGameOver();
             } else {
-                nextRound();
+                clearBattleCards();
             }
         }
 
-        function nextRound() {
-            me.action = null; opp.action = null;
-            document.getElementById('wait-mask').style.display = 'none';
-            document.getElementById('my-played-card').style.opacity = '0';
-            document.getElementById('opp-played-card').style.opacity = '0';
-            startCountdown(); // 结算结束，进入新回合倒计时
+        function clearBattleCards() {
+            me.action=null; opp.action=null;
+            document.getElementById('wait-mask').style.display='none';
+            const myCard = document.getElementById('my-played-card');
+            const oppCard = document.getElementById('opp-played-card');
+            myCard.style.opacity = '0';
+            oppCard.style.opacity = '0';
+            setTimeout(() => {
+                myCard.innerHTML = ''; oppCard.innerHTML = '';
+                myCard.className = 'battle-card opacity-0'; oppCard.className = 'battle-card opacity-0';
+                myCard.style.backgroundImage = 'none'; oppCard.style.backgroundImage = 'none';
+                updateControls();
+            }, 200);
         }
 
         function updateUI() {
-            const draw = (val) => Array(4).fill(0).map((_,i) => `<div class="orb ${i<val?'orb-active':'orb-empty'}"></div>`).join('');
-            document.getElementById('my-orbs').innerHTML = draw(me.nianli);
-            document.getElementById('opp-orbs').innerHTML = draw(opp.nianli);
-            
+            renderOrbs();
+            updateControls();
+        }
+
+        function renderOrbs() {
+            const makeOrbs = (val) => Array(4).fill(0).map((_, i) => `<div class="orb ${i < val ? 'orb-active' : 'orb-empty'}"></div>`).join('');
+            document.getElementById('my-orbs').innerHTML = makeOrbs(me.nianli);
+            document.getElementById('opp-orbs').innerHTML = makeOrbs(opp.nianli);
+        }
+
+        function updateControls() {
             ['a1','a2','a3','a4','d0','d1','d2','d3','d4'].forEach(id => {
-                const btn = document.getElementById('btn-'+id);
-                if(btn) {
-                    const level = parseInt(id[1]);
-                    if(me.nianli < level) btn.classList.add('disabled');
-                    else btn.classList.remove('disabled');
+                const el = document.getElementById('btn-'+id);
+                if(el) {
+                    if(me.nianli < parseInt(id[1])) el.classList.add('disabled');
+                    else el.classList.remove('disabled');
                 }
             });
         }
 
-        socket.on('opponent_disconnected', () => { alert('对手精神崩溃，已切断连接'); location.reload(); });
+        function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+        function showGameOver() {
+            document.getElementById('game-over-panel').style.display = 'flex';
+            document.getElementById('result-title').innerText = !me.alive && !opp.alive ? '两败俱伤' : (!me.alive ? '意志崩溃' : '完胜');
+            document.getElementById('result-title').className = `text-5xl font-black mb-6 ${!me.alive ? 'text-rose-500' : 'text-blue-500'}`;
+        }
+
+        function requestRestart() { socket.emit('RESTART'); resetGameState(); }
+
+        function resetGameState() {
+            me = { nianli: 0, alive: true, action: null }; opp = { nianli: 0, alive: true, action: null }; gameOver = false;
+            document.getElementById('game-over-panel').style.display = 'none';
+            document.getElementById('my-avatar').classList.remove('hero-dead');
+            document.getElementById('opp-avatar').classList.remove('hero-dead');
+            clearBattleCards();
+            renderOrbs();
+        }
     </script>
 </body>
 </html>
